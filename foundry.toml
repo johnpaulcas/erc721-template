@@ -1,7 +1,7 @@
 [profile.default]
 src = 'src'
 out = 'out'
-solc= '0.8.13'
+solc= '0.8.7'
 libs = ["node_modules", "lib"]
 remappings = [
     'eth-gas-reporter/=node_modules/eth-gas-reporter/',
