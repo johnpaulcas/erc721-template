@@ -5,6 +5,12 @@ interface IBaseERC721Mint {
     /// @dev Event emitted when user mints a token
     event Mint(address indexed to, uint256 indexed totalMinted);
 
+    /// @dev Event emitted when the treasury receives funds
+    event TransferFundToTreasury(
+        address indexed treasury,
+        uint256 indexed amount
+    );
+
     /**
      * @dev Function to mint a new ERC721 token.
      * @param _to The address to which the token will be minted.
