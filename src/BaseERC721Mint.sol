@@ -23,6 +23,11 @@ abstract contract BaseERC721Mint is ERC721, ReentrancyGuard, IBaseERC721Mint {
     uint256 private nextTokenId;
     uint256 public totalSupply;
 
+    // maximum number of tokens that can be minted per address during the premint phase.
+    uint256 public premintPerAddressLimit;
+    // keeps track of the number of tokens minted for each address during the premint phase.
+    mapping(address => uint256) public premintLookup;
+
     /**
      * @dev Constructor function for ERC721Mint contract.
      * @param _name The name of the ERC721 token.
@@ -51,7 +56,7 @@ abstract contract BaseERC721Mint is ERC721, ReentrancyGuard, IBaseERC721Mint {
         }
 
         // Increases the total supply of tokens by `_numberOfTokensToMint`.
-        //  If the total supply exceeds the maximum supply, it reverts with an error.
+        // If the total supply exceeds the maximum supply, it reverts with an error.
         totalSupply += _numberOfTokensToMint;
         if (totalSupply > MAX_SUPPLY) {
             revert Errors.MaxSupplyReached();
@@ -69,7 +74,7 @@ abstract contract BaseERC721Mint is ERC721, ReentrancyGuard, IBaseERC721Mint {
     }
 
     /**
-     * @dev Transfers the specified amount of funds to the treasury address.
+     * @dev Transfers the specified amount of funds to the treasury address. Emits a {TransferFundToTreasury} event.
      * @param _totalMintPrice The total amount to be transferred to the treasury.
      */
     function _transferFundToTreasury(uint256 _totalMintPrice) internal {
@@ -77,6 +82,8 @@ abstract contract BaseERC721Mint is ERC721, ReentrancyGuard, IBaseERC721Mint {
         if (!success) {
             revert Errors.TransferFundToTreasuryFailed();
         }
+
+        emit TransferFundToTreasury(treasury, _totalMintPrice);
     }
 
     /**
