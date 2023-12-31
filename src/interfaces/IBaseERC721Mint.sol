@@ -12,9 +12,9 @@ interface IBaseERC721Mint {
     );
 
     /**
-     * @dev Function to mint a new ERC721 token.
-     * @param _to The address to which the token will be minted.
-     * @param _numberOfTokensToMint The number of tokens to mint.
+     * @dev Mint a specified number of tokens to the caller.
+     * @param _numberOfTokens The number of tokens to mint.
+     * @notice The receiver of the tokens will be the `msg.sender`.
      */
-    function mint(address _to, uint256 _numberOfTokensToMint) external payable;
+    function mint(uint256 _numberOfTokens) external payable;
 }

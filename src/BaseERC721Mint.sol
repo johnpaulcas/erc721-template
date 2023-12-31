@@ -46,29 +46,28 @@ abstract contract BaseERC721Mint is ERC721, ReentrancyGuard, IBaseERC721Mint {
     }
 
     function mint(
-        address _to,
-        uint256 _numberOfTokensToMint
+        uint256 _numberOfTokens
     ) public payable override nonReentrant {
         // Checks if the sender has provided enough funds to mint the specified number of tokens.
-        uint256 totalMintPrice = _numberOfTokensToMint * mintPriceInWei;
+        uint256 totalMintPrice = _numberOfTokens * mintPriceInWei;
         if (msg.value < totalMintPrice) {
             revert Errors.NotEnoughFunds();
         }
 
-        // Increases the total supply of tokens by `_numberOfTokensToMint`.
+        // Increases the total supply of tokens by `_numberOfTokens`.
         // If the total supply exceeds the maximum supply, it reverts with an error.
-        totalSupply += _numberOfTokensToMint;
+        totalSupply += _numberOfTokens;
         if (totalSupply > MAX_SUPPLY) {
             revert Errors.MaxSupplyReached();
         }
 
         _transferFundToTreasury(totalMintPrice);
 
-        emit Mint(_to, _numberOfTokensToMint);
+        emit Mint(_msgSender(), _numberOfTokens);
 
         uint256 mintCount = 0;
-        for (mintCount; mintCount < _numberOfTokensToMint; mintCount++) {
-            _safeMint(_to, _getNextTokenId());
+        for (mintCount; mintCount < _numberOfTokens; mintCount++) {
+            _safeMint(_msgSender(), _getNextTokenId());
             _incrementNextTokenId();
         }
     }
