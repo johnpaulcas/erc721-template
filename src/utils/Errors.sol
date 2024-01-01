@@ -10,4 +10,13 @@ library Errors {
 
     /// @dev Error thrown when the transfer of funds to the treasury failed
     error TransferFundToTreasuryFailed();
+
+    /// @dev Error thrown when the user has reached the premint limit
+    error PremintLimitExceeded();
+
+    /// @dev Error thrown when the user is not qualified for the premint phase
+    error NotQualifiedForPremint();
+
+    /// @dev Error thrown when the user doesn't have the required `role` to perform secure actions
+    error UnauthorizedAccount(bytes32 role, address account);
 }
