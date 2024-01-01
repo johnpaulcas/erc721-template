@@ -3,6 +3,8 @@ pragma solidity >=0.8.9;
 
 import { ERC721 } from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { MerkleProof } from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
 
 import { IBaseERC721Mint } from "./interfaces/IBaseERC721Mint.sol";
 import { Errors } from "./utils/Errors.sol";
@@ -14,7 +16,14 @@ import { Errors } from "./utils/Errors.sol";
  * It also includes the ReentrancyGuard modifier to prevent reentrancy attacks.
  * @author johnpaulcas
  */
-abstract contract BaseERC721Mint is ERC721, ReentrancyGuard, IBaseERC721Mint {
+abstract contract BaseERC721Mint is
+    ERC721,
+    ReentrancyGuard,
+    AccessControl,
+    IBaseERC721Mint
+{
+    bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
+
     uint256 public constant MAX_SUPPLY = 10000;
 
     address public treasury;
@@ -27,6 +36,8 @@ abstract contract BaseERC721Mint is ERC721, ReentrancyGuard, IBaseERC721Mint {
     uint256 public premintPerAddressLimit;
     // keeps track of the number of tokens minted for each address during the premint phase.
     mapping(address => uint256) public premintLookup;
+    // merkle root for the premint phase.
+    bytes32 public premintMerkleRoot;
 
     /**
      * @dev Constructor function for ERC721Mint contract.
@@ -45,9 +56,45 @@ abstract contract BaseERC721Mint is ERC721, ReentrancyGuard, IBaseERC721Mint {
         mintPriceInWei = _mintPriceInWei;
     }
 
+    modifier hasManagerRole() {
+        /**
+         * @dev Modifier to check if the caller has the MANAGER_ROLE.
+         * If the caller does not have the MANAGER_ROLE, it reverts the transaction
+         * with an "UnauthorizedAccount" error.
+         */
+        if (!hasRole(MANAGER_ROLE, _msgSender())) {
+            revert Errors.UnauthorizedAccount(MANAGER_ROLE, _msgSender());
+        }
+        _;
+    }
+
     function mint(
         uint256 _numberOfTokens
     ) public payable override nonReentrant {
+        _mintTokens(_msgSender(), _numberOfTokens);
+    }
+
+    function premint(
+        uint256 _numberOfTokens,
+        bytes32[] calldata _merkleProof
+    ) public payable override nonReentrant {
+        // Checks if user is qualified for the premint phase.
+        if (!isQualifiedForPremint(_merkleProof)) {
+            revert Errors.NotQualifiedForPremint();
+        }
+
+        // Checks if the sender has exceeded the limit of tokens that can be minted during the premint phase.
+        uint256 premintCount = premintLookup[_msgSender()];
+        if (premintCount + _numberOfTokens > premintPerAddressLimit) {
+            revert Errors.PremintLimitExceeded();
+        }
+
+        premintLookup[_msgSender()] += _numberOfTokens;
+
+        _mintTokens(_msgSender(), _numberOfTokens);
+    }
+
+    function _mintTokens(address _to, uint256 _numberOfTokens) private {
         // Checks if the sender has provided enough funds to mint the specified number of tokens.
         uint256 totalMintPrice = _numberOfTokens * mintPriceInWei;
         if (msg.value < totalMintPrice) {
@@ -63,13 +110,55 @@ abstract contract BaseERC721Mint is ERC721, ReentrancyGuard, IBaseERC721Mint {
 
         _transferFundToTreasury(totalMintPrice);
 
-        emit Mint(_msgSender(), _numberOfTokens);
+        emit Mint(_to, _numberOfTokens);
 
         uint256 mintCount = 0;
         for (mintCount; mintCount < _numberOfTokens; mintCount++) {
-            _safeMint(_msgSender(), _getNextTokenId());
+            _safeMint(_to, _getNextTokenId());
             _incrementNextTokenId();
         }
+    }
+
+    function isQualifiedForPremint(
+        bytes32[] calldata _merkleProof
+    ) public view override returns (bool) {
+        bytes32 leaf = keccak256(abi.encodePacked(_msgSender()));
+        return _verifyPremintMerkleProof(_merkleProof, leaf);
+    }
+
+    function setPremintMerkleRoot(
+        bytes32 _merkleRoot
+    ) external override hasManagerRole {
+        premintMerkleRoot = _merkleRoot;
+    }
+
+    /**
+     * @dev Sets the maximum number of tokens that can be minted per address during the premint phase.
+     * @param _premintPerAddressLimit The maximum number of tokens that can be minted per address during the premint phase.
+     */
+    function setPremintPerAddressLimit(
+        uint256 _premintPerAddressLimit
+    ) external override hasManagerRole {
+        premintPerAddressLimit = _premintPerAddressLimit;
+    }
+
+    /**
+     * @dev Verifies the merkle proof for the caller's address.
+     * @param _merkleProof The merkle proof for the caller's address.
+     * @param _leaf The leaf node for the caller's address.
+     * @return `true` if the merkle proof is valid, otherwise `false`.
+     */
+    function _verifyPremintMerkleProof(
+        bytes32[] memory _merkleProof,
+        bytes32 _leaf
+    ) internal view returns (bool) {
+        return MerkleProof.verify(_merkleProof, premintMerkleRoot, _leaf);
+    }
+
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view virtual override(ERC721, AccessControl) returns (bool) {
+        return super.supportsInterface(interfaceId);
     }
 
     /**
