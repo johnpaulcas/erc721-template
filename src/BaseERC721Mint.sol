@@ -24,10 +24,7 @@ abstract contract BaseERC721Mint is
 {
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
-    uint256 public constant MAX_SUPPLY = 10000;
-
     address public treasury;
-    uint256 public mintPriceInWei;
 
     uint256 private nextTokenId;
     uint256 public totalSupply;
@@ -44,16 +41,13 @@ abstract contract BaseERC721Mint is
      * @param _name The name of the ERC721 token.
      * @param _symbol The symbol of the ERC721 token.
      * @param _treasury The address where the amount of eth to be sent.
-     * @param _mintPriceInWei The price in Wei for minting a token.
      */
     constructor(
         string memory _name,
         string memory _symbol,
-        address _treasury,
-        uint256 _mintPriceInWei
+        address _treasury
     ) ERC721(_name, _symbol) {
         treasury = _treasury;
-        mintPriceInWei = _mintPriceInWei;
     }
 
     modifier hasManagerRole() {
@@ -94,31 +88,6 @@ abstract contract BaseERC721Mint is
         _mintTokens(_msgSender(), _numberOfTokens);
     }
 
-    function _mintTokens(address _to, uint256 _numberOfTokens) private {
-        // Checks if the sender has provided enough funds to mint the specified number of tokens.
-        uint256 totalMintPrice = _numberOfTokens * mintPriceInWei;
-        if (msg.value < totalMintPrice) {
-            revert Errors.NotEnoughFunds();
-        }
-
-        // Increases the total supply of tokens by `_numberOfTokens`.
-        // If the total supply exceeds the maximum supply, it reverts with an error.
-        totalSupply += _numberOfTokens;
-        if (totalSupply > MAX_SUPPLY) {
-            revert Errors.MaxSupplyReached();
-        }
-
-        _transferFundToTreasury(totalMintPrice);
-
-        emit Mint(_to, _numberOfTokens);
-
-        uint256 mintCount = 0;
-        for (mintCount; mintCount < _numberOfTokens; mintCount++) {
-            _safeMint(_to, _getNextTokenId());
-            _incrementNextTokenId();
-        }
-    }
-
     function isQualifiedForPremint(
         bytes32[] calldata _merkleProof
     ) public view override returns (bool) {
@@ -142,6 +111,41 @@ abstract contract BaseERC721Mint is
         premintPerAddressLimit = _premintPerAddressLimit;
     }
 
+    /// Required override from ERC721.
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view virtual override(ERC721, AccessControl) returns (bool) {
+        return super.supportsInterface(interfaceId);
+    }
+
+    /// @dev Internal function to mint a specified number of tokens to a given address.
+    /// @param _to The address to mint the tokens to.
+    /// @param _numberOfTokens The number of tokens to mint.
+    function _mintTokens(address _to, uint256 _numberOfTokens) private {
+        // Checks if the sender has provided enough funds to mint the specified number of tokens.
+        uint256 totalMintPrice = _numberOfTokens * _mintPriceInWei();
+        if (msg.value < totalMintPrice) {
+            revert Errors.NotEnoughFunds();
+        }
+
+        // Increases the total supply of tokens by `_numberOfTokens`.
+        // If the total supply exceeds the maximum supply, it reverts with an error.
+        totalSupply += _numberOfTokens;
+        if (totalSupply > _maxSupply()) {
+            revert Errors.MaxSupplyReached();
+        }
+
+        _transferFundToTreasury(totalMintPrice);
+
+        emit Mint(_to, _numberOfTokens);
+
+        uint256 mintCount = 0;
+        for (mintCount; mintCount < _numberOfTokens; mintCount++) {
+            _safeMint(_to, _getNextTokenId());
+            _incrementNextTokenId();
+        }
+    }
+
     /**
      * @dev Verifies the merkle proof for the caller's address.
      * @param _merkleProof The merkle proof for the caller's address.
@@ -153,12 +157,6 @@ abstract contract BaseERC721Mint is
         bytes32 _leaf
     ) internal view returns (bool) {
         return MerkleProof.verify(_merkleProof, premintMerkleRoot, _leaf);
-    }
-
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public view virtual override(ERC721, AccessControl) returns (bool) {
-        return super.supportsInterface(interfaceId);
     }
 
     /**
@@ -188,4 +186,16 @@ abstract contract BaseERC721Mint is
     function _getNextTokenId() internal view returns (uint256) {
         return nextTokenId + 1;
     }
+
+    /*//////////////////////////////////////////////////////////////////////////
+        Internal Functions that need to Override by Imlpementing Contracts
+    //////////////////////////////////////////////////////////////////////////*/
+
+    /// @notice Returns the price in Wei for minting a token.
+    /// @dev Overrides _mintPriceInWei() on implementing contracts.
+    function _mintPriceInWei() internal view virtual returns (uint256);
+
+    /// @notice Returns the maximum supply of tokens.
+    /// @dev Overrides _maxSupply() on implementing contracts.
+    function _maxSupply() internal view virtual returns (uint256);
 }
