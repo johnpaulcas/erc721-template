@@ -49,7 +49,7 @@ abstract contract BaseERC721Mint is
         address _initialAdmin
     ) ERC721(_name, _symbol) {
         treasury = _treasury;
-        grantRole(DEFAULT_ADMIN_ROLE, _initialAdmin);
+        _grantRole(DEFAULT_ADMIN_ROLE, _initialAdmin);
     }
 
     modifier hasManagerRole() {
