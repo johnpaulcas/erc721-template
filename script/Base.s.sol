@@ -4,12 +4,12 @@ pragma solidity >=0.8.19;
 import { Script } from "forge-std/Script.sol";
 
 abstract contract BaseScript is Script {
-    /// @dev The address of the transaction broadcaster.
-    address internal broadcaster;
+    /// @dev The private key of the transaction broadcaster.
+    uint256 internal broadcaster;
 
     constructor() {
-        address from = vm.envOr({ name: "ETH_FROM", defaultValue: address(0) });
-        broadcaster = from;
+        uint256 pk = vm.envUint("PRIVATE_KEY");
+        broadcaster = pk;
     }
 
     modifier broadcast() {
