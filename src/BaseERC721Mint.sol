@@ -45,9 +45,11 @@ abstract contract BaseERC721Mint is
     constructor(
         string memory _name,
         string memory _symbol,
-        address _treasury
+        address _treasury,
+        address _initialAdmin
     ) ERC721(_name, _symbol) {
         treasury = _treasury;
+        grantRole(DEFAULT_ADMIN_ROLE, _initialAdmin);
     }
 
     modifier hasManagerRole() {
